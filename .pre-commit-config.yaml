@@ -1,0 +1,47 @@
+repos:
+  # General file hygiene hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+
+  # Dart / Flutter hooks
+  - repo: local
+    hooks:
+      # 1. Apply automated fixes: removes unused imports, dead code, deprecations, etc.
+      - id: dart-fix
+        name: Dart Fix
+        description: Apply dart fix --apply (unused imports, deprecated APIs, quick-fixes)
+        language: system
+        entry: dart fix --apply
+        pass_filenames: false
+        always_run: true
+
+      # 2. Format all Dart files; fails if any file was reformatted (forces re-stage)
+      - id: dart-format
+        name: Dart Format
+        description: Format Dart source files with dart format
+        language: system
+        entry: dart format --set-exit-if-changed .
+        pass_filenames: false
+        always_run: true
+        types_or: [dart]
+
+      # 3. Static analysis & linting
+      - id: flutter-analyze
+        name: Flutter Analyze
+        description: Run flutter analyze to catch lint warnings and errors
+        language: system
+        entry: flutter analyze --no-pub
+        pass_filenames: false
+        always_run: true
