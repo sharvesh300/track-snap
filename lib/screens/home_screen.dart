@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../models/song_model.dart';
+import 'package:provider/provider.dart';
+
+import '../models/listen_state.dart';
+import '../providers/recognition_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_background.dart';
 import '../widgets/header_bar.dart';
@@ -10,62 +13,32 @@ import '../widgets/waveform_animation.dart';
 
 /// The sole screen of TrackSnap.
 ///
-/// Owns all detection UI state and drives the mock detection flow:
+/// Reads [RecognitionProvider] from context and drives the UI accordingly:
 /// 1. Idle → user taps the button.
-/// 2. Listening → waveform appears, 3-second mock "analysis" timer starts.
-/// 3. Detected → song result card slides up.
-///
-/// Tapping the button while listening cancels and returns to idle.
-/// Dismissing the result card also returns to idle.
-class HomeScreen extends StatefulWidget {
+/// 2. Listening → audio is recorded and streamed to the backend.
+/// 3. Detected / NoMatch / Error → result card or hint text updates.
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  ListenState _listenState = ListenState.idle;
-  SongModel? _detectedSong;
-
-  void _handleButtonTap() {
-    switch (_listenState) {
+  void _handleButtonTap(BuildContext context, ListenState state) {
+    final provider = context.read<RecognitionProvider>();
+    switch (state) {
       case ListenState.idle:
-        _startListening();
+      case ListenState.error:
+        provider.startListening();
       case ListenState.listening:
-        _resetToIdle();
+        provider.stopListening();
       case ListenState.detected:
-        _resetToIdle();
+      case ListenState.noMatch:
+        provider.dismissResult();
     }
-  }
-
-  /// Begins the mock detection flow.
-  void _startListening() {
-    setState(() {
-      _listenState = ListenState.listening;
-      _detectedSong = null;
-    });
-
-    // Simulate a 3-second audio analysis delay.
-    Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted) return;
-      if (_listenState != ListenState.listening) return; // was cancelled
-      setState(() {
-        _listenState = ListenState.detected;
-        _detectedSong = SongModel.mock;
-      });
-    });
-  }
-
-  void _resetToIdle() {
-    setState(() {
-      _listenState = ListenState.idle;
-      _detectedSong = null;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<RecognitionProvider>();
+    final state = provider.state;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: AnimatedBackground(
@@ -79,30 +52,38 @@ class _HomeScreenState extends State<HomeScreen> {
               const Expanded(flex: 2, child: _GreetingSection()),
 
               // ── Detection button ───────────────────────────────────────────
-              ListenButton(state: _listenState, onTap: _handleButtonTap),
+              ListenButton(
+                state: state,
+                onTap: () => _handleButtonTap(context, state),
+              ),
 
               const SizedBox(height: 28),
 
               // ── Waveform ───────────────────────────────────────────────────
-              WaveformAnimation(
-                isActive: _listenState == ListenState.listening,
-              ),
+              WaveformAnimation(isActive: state == ListenState.listening),
 
               // ── Hint text below waveform ───────────────────────────────────
               const SizedBox(height: 12),
-              _HintText(state: _listenState),
+              _HintText(state: state, errorMessage: provider.errorMessage),
 
-              // ── Spacer before card ─────────────────────────────────────────
-              const Expanded(flex: 3, child: SizedBox()),
-
-              // ── Song result card ───────────────────────────────────────────
-              SongResultCard(
-                song: _detectedSong ?? SongModel.mock,
-                isVisible: _listenState == ListenState.detected,
-                onDismiss: _resetToIdle,
+              // ── Spacer + result card ──────────────────────────────────────
+              // Card lives inside the Expanded so it can never overflow the column.
+              Expanded(
+                flex: 3,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    child: provider.song != null
+                        ? SongResultCard(
+                            song: provider.song!,
+                            isVisible: state == ListenState.detected,
+                            onDismiss: provider.dismissResult,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
               ),
-
-              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -152,16 +133,28 @@ class _GreetingSection extends StatelessWidget {
 // ── Hint text ──────────────────────────────────────────────────────────────
 
 class _HintText extends StatelessWidget {
-  const _HintText({required this.state});
+  const _HintText({required this.state, this.errorMessage});
 
   final ListenState state;
+  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
-    final text = switch (state) {
-      ListenState.idle => '',
-      ListenState.listening => 'Hold near the music source…',
-      ListenState.detected => 'Song identified!',
+    final (text, color) = switch (state) {
+      ListenState.idle => ('', AppTheme.textSecondary),
+      ListenState.listening => (
+        'Listening… hold near the music source',
+        AppTheme.textSecondary,
+      ),
+      ListenState.detected => ('Song identified!', const Color(0xFF22C55E)),
+      ListenState.noMatch => (
+        'No match found. Tap to try again.',
+        AppTheme.textMuted,
+      ),
+      ListenState.error => (
+        errorMessage ?? 'Something went wrong.',
+        Colors.redAccent,
+      ),
     };
 
     return AnimatedSwitcher(
@@ -172,13 +165,12 @@ class _HintText extends StatelessWidget {
               text,
               key: ValueKey(text),
               style: TextStyle(
-                color: state == ListenState.detected
-                    ? const Color(0xFF22C55E)
-                    : AppTheme.textSecondary,
+                color: color,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,
               ),
+              textAlign: TextAlign.center,
             ),
     );
   }

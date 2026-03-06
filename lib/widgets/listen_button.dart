@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/listen_state.dart';
 import '../theme/app_theme.dart';
-
-/// The three possible states for the listen button.
-enum ListenState { idle, listening, detected }
 
 /// Large circular button that acts as the primary interaction point.
 ///
@@ -266,6 +264,16 @@ class _ButtonFace extends StatelessWidget {
         Icons.check_circle_rounded,
         'FOUND IT!',
         const Color(0xFF22C55E),
+      ),
+      ListenState.noMatch => (
+        Icons.music_off_rounded,
+        'NO MATCH',
+        AppTheme.textMuted,
+      ),
+      ListenState.error => (
+        Icons.error_outline_rounded,
+        'ERROR',
+        Colors.redAccent,
       ),
     };
 

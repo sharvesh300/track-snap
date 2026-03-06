@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'providers/recognition_provider.dart';
 import 'screens/home_screen.dart';
 import 'theme/app_theme.dart';
 
@@ -20,7 +22,12 @@ void main() {
     ),
   );
 
-  runApp(const TrackSnapApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => RecognitionProvider(),
+      child: const TrackSnapApp(),
+    ),
+  );
 }
 
 class TrackSnapApp extends StatelessWidget {

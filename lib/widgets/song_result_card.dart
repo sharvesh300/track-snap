@@ -81,8 +81,8 @@ class _CardBody extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // ── Album art ───────────────────────────────────────────────
-                        _AlbumArt(url: song.albumArtUrl),
+                        // ── Album art placeholder ──────────────────────────────────
+                        const _AlbumArtPlaceholder(),
                         const SizedBox(width: 16),
 
                         // ── Metadata ────────────────────────────────────────────────
@@ -115,12 +115,10 @@ class _CardBody extends StatelessWidget {
   }
 }
 
-// ── Album art ──────────────────────────────────────────────────────────────
+// ── Album art placeholder ─────────────────────────────────────────────────
 
-class _AlbumArt extends StatelessWidget {
-  const _AlbumArt({required this.url});
-
-  final String url;
+class _AlbumArtPlaceholder extends StatelessWidget {
+  const _AlbumArtPlaceholder();
 
   @override
   Widget build(BuildContext context) {
@@ -128,6 +126,7 @@ class _AlbumArt extends StatelessWidget {
       width: 80,
       height: 80,
       decoration: BoxDecoration(
+        color: AppTheme.surfaceVariant,
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
@@ -137,35 +136,22 @@ class _AlbumArt extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          errorBuilder: (context, err, stack) => const ColoredBox(
-            color: AppTheme.surfaceVariant,
-            child: Icon(
-              Icons.album_rounded,
-              color: AppTheme.neonPurple,
-              size: 36,
-            ),
-          ),
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return const ColoredBox(
-              color: AppTheme.surfaceVariant,
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: AppTheme.neonPurple,
-                  strokeWidth: 2,
-                ),
-              ),
-            );
-          },
-        ),
+      child: const Icon(
+        Icons.music_note_rounded,
+        color: AppTheme.neonPurple,
+        size: 36,
       ),
     );
   }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+String _formatOffset(double seconds) {
+  final total = seconds.truncate();
+  final m = total ~/ 60;
+  final s = total % 60;
+  return '$m:${s.toString().padLeft(2, '0')}';
 }
 
 // ── Song metadata column ───────────────────────────────────────────────────
@@ -177,15 +163,13 @@ class _SongMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final confidence = song.confidence.toInt();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Title
+        // Song name
         Text(
-              song.title,
+              song.name,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -200,9 +184,9 @@ class _SongMeta extends StatelessWidget {
 
         const SizedBox(height: 3),
 
-        // Artist
+        // Timestamp
         Text(
-              song.artist,
+              'Identified at ${song.timestamp}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondary,
                 fontWeight: FontWeight.w500,
@@ -216,9 +200,9 @@ class _SongMeta extends StatelessWidget {
 
         const SizedBox(height: 2),
 
-        // Album
+        // Offset
         Text(
-          song.album,
+          '${_formatOffset(song.offsetSeconds)} into track',
           style: Theme.of(
             context,
           ).textTheme.labelSmall?.copyWith(color: AppTheme.textMuted),
@@ -229,7 +213,7 @@ class _SongMeta extends StatelessWidget {
         const SizedBox(height: 8),
 
         // Confidence pill
-        _ConfidencePill(confidence: confidence)
+        _ConfidencePill(confidence: song.confidencePercent)
             .animate()
             .fadeIn(delay: 320.ms, duration: 400.ms)
             .slideX(begin: -0.1, end: 0, delay: 320.ms, duration: 400.ms),
